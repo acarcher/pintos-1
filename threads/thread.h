@@ -93,6 +93,20 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /********** Edited by acarcher **********
+      * Alarm clock
+      *   wake
+      * Priority scheduler
+      *   priority_base
+      *   donors
+      *   donorselem
+      *   thread_waiting_on
+    /**********                    **********/
+
+    int64_t wake;                         /* Tick to wake up on */
+
+
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -137,5 +151,12 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/********** Edited by acarcher **********
+ * wakecmp
+/**********                    **********/
+
+bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
+
 
 #endif /* threads/thread.h */

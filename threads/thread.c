@@ -582,3 +582,19 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/********** Edited by acarcher **********
+ * wakecmp
+ *  Compares the wake member of different threads
+/**********                    **********/
+
+bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
+  // list_entry needs: list_elem pointer, name of structure, and member name
+  // returns the containing struct, which is a thread
+
+  struct thread *t1 = list_entry(e1, struct thread, elem);
+  struct thread *t2 = list_entry(e2, struct thread, elem);
+
+  return t1->wake < t2->wake;
+
+}
