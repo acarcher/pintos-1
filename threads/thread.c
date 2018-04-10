@@ -583,10 +583,16 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * wakecmp
  *  Compares the wake member of different threads
-/**********                    **********/
+ * prioritycmp
+ *  Compares the priority member of different threads
+ * thread_donate_priority
+ *  
+ * thread_update_priority
+ *  
+\**********                    **********/
 
 bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
   // list_entry needs: list_elem pointer, name of structure, and member name
@@ -597,4 +603,13 @@ bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
 
   return t1->wake < t2->wake;
 
+}
+
+bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
+}
+
+void thread_donate_priority(struct thread *t){
+}
+
+void thread_update_priority(struct thread *t){
 }
