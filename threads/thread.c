@@ -296,6 +296,10 @@ thread_exit (void)
   NOT_REACHED ();
 }
 
+/********** Edited by acarcher **********\
+ * Adds thread to correct spot in ready queue
+ * 
+\**********                    **********/
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
@@ -307,8 +311,11 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread){
+      list_sort(&ready_list, (list_less_func *) prioritycmp, NULL); // sort + includes assertion
+      list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) prioritycmp, NULL);
+  } 
+
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -583,10 +590,16 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * wakecmp
  *  Compares the wake member of different threads
-/**********                    **********/
+ * prioritycmp
+ *  Compares the priority member of different threads
+ * thread_donate_priority
+ *  
+ * thread_update_priority
+ *  
+\**********                    **********/
 
 bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
   // list_entry needs: list_elem pointer, name of structure, and member name
@@ -597,4 +610,20 @@ bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
 
   return t1->wake < t2->wake;
 
+}
+
+bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
+  // list_entry needs: list_elem pointer, name of structure, and member name
+  // returns the containing struct, which is a thread
+
+  struct thread *t1 = list_entry(e1, struct thread, elem);
+  struct thread *t2 = list_entry(e2, struct thread, elem);
+
+  return t1->priority > t2->priority;
+}
+
+void thread_donate_priority(struct thread *t){
+}
+
+void thread_update_priority(struct thread *t){
 }

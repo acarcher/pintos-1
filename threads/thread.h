@@ -93,7 +93,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    /********** Edited by acarcher **********
+    /********** Edited by acarcher **********\
       * Alarm clock
       *   wake
       * Priority scheduler
@@ -101,11 +101,18 @@ struct thread
       *   donors
       *   donorselem
       *   thread_waiting_on
-    /**********                    **********/
+    \**********                    **********/
 
+    /* Alarm clock */
     int64_t wake;                         /* Tick to wake up on */
 
+   /* Priority Scheduler */
+    int priority_base;                  /* Assigned at creation and when no donors */
+    struct list donors;                 /* List of threads that are seeking to donate priority */
+    struct list_elem donorselem;        /* A way to access the donor */
+    struct thread *thread_waiting_on;   /* Thread that has shared resource */
 
+    /* Advanced Scheduler */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -152,11 +159,18 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * wakecmp
-/**********                    **********/
+ * prioritycmp
+ * thread_donate_priority
+ * thread_update_priority
+\**********                    **********/
 
 bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
+bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
+
+void thread_donate_priority(struct thread *t);
+void thread_update_priority(struct thread *t);
 
 
 #endif /* threads/thread.h */
