@@ -18,9 +18,9 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * List of threads that are sleeping.
-/**********                    **********/
+\**********                    **********/
 static struct list sleeping_threads; 
 
 /* Number of timer ticks since OS booted. */
@@ -36,9 +36,9 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * Initialize the sleeping thread list.
-/**********                    **********/
+\**********                    **********/
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -97,7 +97,7 @@ timer_elapsed (int64_t then)
 /********** Edited by acarcher **********
  * Sets the wake member of thread.
  * Adds thread to ordered sleeping_threads list.
-/**********                    **********/
+\**********                    **********/
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
@@ -190,10 +190,10 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/********** Edited by acarcher **********
+/********** Edited by acarcher **********\
  * Manages the sleeping_threads list.
  * Wakes threads at appropriate time.
-/**********                    **********/
+\**********                    **********/
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
