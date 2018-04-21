@@ -24,6 +24,11 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/* Random value for struct thread's `magic' member.
+   Used to detect stack overflow.  See the big comment at the top
+   of thread.h for details. */
+#define THREAD_MAGIC 0xcd6abf4b
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -100,7 +105,7 @@ struct thread
       *   priority_base
       *   donors
       *   donorselem
-      *   thread_waiting_on
+      *   thread_blocked_on
     \**********                    **********/
 
     /* Alarm clock */
@@ -110,7 +115,8 @@ struct thread
     int priority_base;                  /* Assigned at creation and when no donors */
     struct list donors;                 /* List of threads that are seeking to donate priority */
     struct list_elem donorselem;        /* A way to access the donor */
-    struct thread *thread_waiting_on;   /* Thread that has shared resource */
+    struct thread *thread_blocked_on;   /* Thread that has shared resource */
+    struct lock *lock_blocked_on;
 
     /* Advanced Scheduler */
 
@@ -170,7 +176,8 @@ bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
 bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
 
 void thread_donate_priority(struct thread *t);
-void thread_update_priority(struct thread *t);
+void thread_update_priority(struct thread *t, struct lock *lock);
+size_t thread_remove_blocked_donors(struct thread *t, struct lock *lock);
 
 
 #endif /* threads/thread.h */

@@ -33,7 +33,7 @@
 #include "threads/thread.h"
 
 /********** Edited by acarcher **********\
- * condcmp
+ * condcmp static declaration
  * 
 \**********                    **********/
 static bool condcmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
@@ -57,7 +57,7 @@ sema_init (struct semaphore *sema, unsigned value)
 }
 
 /********** Edited by acarcher **********\
- * sema_down sorts waiters according to thread priority
+ * sorts waiters according to thread priority
  * 
 \**********                    **********/
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -135,7 +135,7 @@ sema_up (struct semaphore *sema)
   }
   sema->value++;
   intr_set_level (old_level);
-  thread_yield();
+  thread_yield(); //unblocked thread might be higher level
 }
 
 static void sema_test_helper (void *sema_);
@@ -199,6 +199,11 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+/********** Edited by acarcher **********\
+ * lock_acquire
+ *  
+\**********                    **********/
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -214,8 +219,21 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  struct thread *cur = thread_current ();
+
+  if(lock->holder && !thread_mlfqs){ //if a thread has the lock && not MLFQS
+    //printf("[lock_acquire] Lock is held\n");
+    
+    cur->thread_blocked_on = lock->holder;
+    cur->lock_blocked_on = lock;
+    thread_donate_priority(cur);
+
+  }else{
+    cur->thread_blocked_on = NULL; //satan?
+  }
+
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -233,8 +251,10 @@ lock_try_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   success = sema_try_down (&lock->semaphore);
-  if (success)
+  if (success){
     lock->holder = thread_current ();
+    thread_current()->thread_blocked_on = NULL;
+  }
   return success;
 }
 
@@ -249,8 +269,16 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  if(!thread_mlfqs) thread_update_priority(thread_current(), lock);
+
+  intr_set_level(old_level);
+
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -339,6 +367,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)){
+
     list_sort(&cond->waiters, (list_less_func *) condcmp, NULL);
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);

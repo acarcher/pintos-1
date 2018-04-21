@@ -15,10 +15,6 @@
 #include "userprog/process.h"
 #endif
 
-/* Random value for struct thread's `magic' member.
-   Used to detect stack overflow.  See the big comment at the top
-   of thread.h for details. */
-#define THREAD_MAGIC 0xcd6abf4b
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -321,11 +317,10 @@ thread_yield (void)
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
-
   old_level = intr_disable ();
   if (cur != idle_thread){
-      list_sort(&ready_list, (list_less_func *) prioritycmp, NULL); // sort + includes assertion
-      list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) prioritycmp, NULL);
+    list_push_back(&ready_list, &cur->elem);
+    list_sort(&ready_list, (list_less_func *) prioritycmp, NULL); // sort + includes assertion
   } 
 
   cur->status = THREAD_READY;
@@ -359,9 +354,16 @@ void
 thread_set_priority (int new_priority) 
 {
   struct thread *cur = thread_current ();
+
+  if(cur->priority == new_priority) return; //NEW
+
   int old_priority = cur->priority;
 
   cur->priority = new_priority;
+
+  if(list_empty(&cur->donors)){ // We know that the new priority is not donated (both updated)
+    cur->priority_base = new_priority;
+  }
 
   if (cur->priority < old_priority) thread_yield (); // new priority is lower so we might need to yield .. don't yield in an interrupt
 }
@@ -474,6 +476,10 @@ is_thread (struct thread *t)
   return t != NULL && t->magic == THREAD_MAGIC;
 }
 
+/********** Edited by acarcher **********\
+ * initailizes added members
+ * 
+\**********                    **********/
 /* Does basic initialization of T as a blocked thread named
    NAME. */
 static void
@@ -490,6 +496,12 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  t->priority_base = priority;
+  t->thread_blocked_on = NULL;
+  t->lock_blocked_on = NULL;
+  list_init(&t->donors);
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -644,7 +656,76 @@ bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
 }
 
 void thread_donate_priority(struct thread *t){
+
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
+  while(t->thread_blocked_on != NULL){ //While there is a priority chain
+    
+    if(t->priority > t->thread_blocked_on->priority){
+
+      list_push_front(&t->thread_blocked_on->donors, &t->donorselem);
+      t->thread_blocked_on->priority = t->priority;
+
+    }
+    t = t->thread_blocked_on; //***
+
+  }
+
+  //t->thread_blocked_on = NULL; //** do i need this LUL
+  list_sort(&ready_list, (list_less_func *) prioritycmp, NULL); //do i need this
+
+  intr_set_level (old_level);
 }
 
-void thread_update_priority(struct thread *t){
+void thread_update_priority(struct thread *t, struct lock *lock){
+
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  
+  struct list_elem *e;
+
+  if(thread_remove_blocked_donors(t,lock) > 0){
+    
+    list_sort(&t->donors, (list_less_func *) prioritycmp, NULL);
+    e = list_front(&t->donors); //grab the highest donor
+
+    struct thread *donor = list_entry(e, struct thread, donorselem); //access the donor thread for their priority
+    
+    if(donor->priority > t->priority_base){ //make sure we don't lower our own priority through donation
+
+      thread_set_priority(donor->priority); //donate priority
+    
+    } else
+      thread_set_priority(t->priority_base);
+
+    list_remove(e); // remove donor; must come after set_priority is called so that set_priority updates priority_base correctly
+    
+  } else { // we have no donors and therefore should set priority back to priority_base
+    thread_set_priority(t->priority_base);
+  }
+
+  intr_set_level (old_level);
+
+}
+
+size_t thread_remove_blocked_donors(struct thread *t, struct lock *lock){
+
+  struct list_elem *e;
+
+  if(list_size(&t->donors) == 0) return 0;
+
+  for (e = list_begin(&t->donors); e != list_end(&t->donors); e = list_next(e))
+  {
+    struct thread *donor = list_entry(e, struct thread, donorselem);
+
+    if(donor->thread_blocked_on == t && donor->lock_blocked_on == lock){
+      list_remove(e);
+      donor->thread_blocked_on = NULL;
+      donor->lock_blocked_on = NULL;
+    }
+    
+  }
+
+  return list_size(&t->donors);
 }
