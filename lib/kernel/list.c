@@ -530,6 +530,7 @@ list_min (struct list *list, list_less_func *less, void *aux)
  * 
 \**********                    **********/
 /* Prints the contents of a given list element by element */
+/*
 void list_print(struct list *list, struct list_elem *e){
   
   printf("list_print\n");
@@ -551,4 +552,4 @@ void list_print(struct list *list, struct list_elem *e){
     i++;
   }
 
-}
+}*/

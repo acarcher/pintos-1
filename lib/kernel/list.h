@@ -184,6 +184,6 @@ struct list_elem *list_min (struct list *, list_less_func *, void *aux);
  *  
 \**********                    **********/
 /* Print the contents of a list */
-void list_print(struct list *, struct list_elem *);
+//void list_print(struct list *, struct list_elem *);
 
 #endif /* lib/kernel/list.h */

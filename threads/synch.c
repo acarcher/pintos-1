@@ -32,11 +32,6 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/********** Edited by acarcher **********\
- * condcmp static declaration
- * 
-\**********                    **********/
-static bool condcmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -57,7 +52,8 @@ sema_init (struct semaphore *sema, unsigned value)
 }
 
 /********** Edited by acarcher **********\
- * sorts waiters according to thread priority
+ * sema_down
+ *  * Sorts waiters based on thread priority
  * 
 \**********                    **********/
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -113,7 +109,8 @@ sema_try_down (struct semaphore *sema)
 }
 
 /********** Edited by acarcher **********\
- * sorts waiters according to thread priority and yields
+ * sema_up
+ *  * Sorts waiters based on priority and yields
  * 
 \**********                    **********/
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
@@ -201,7 +198,10 @@ lock_init (struct lock *lock)
 
 /********** Edited by acarcher **********\
  * lock_acquire
- *  
+ *  * Checks for lock holder and donates priority
+ *  * Sets acquired lock priority to current priority
+ *  * Adds acquired lock to lock_list and sorts
+ * 
 \**********                    **********/
 
 /* Acquires LOCK, sleeping until it becomes available if
@@ -221,19 +221,24 @@ lock_acquire (struct lock *lock)
 
   struct thread *cur = thread_current ();
 
-  if(lock->holder && !thread_mlfqs){ //if a thread has the lock && not MLFQS
+  if(lock->holder && !thread_mlfqs){
     //printf("[lock_acquire] Lock is held\n");
-    
-    cur->thread_blocked_on = lock->holder;
     cur->lock_blocked_on = lock;
-    thread_donate_priority(cur);
-
-  }else{
-    cur->thread_blocked_on = NULL; //satan?
+    thread_donate_priority();
   }
 
   sema_down (&lock->semaphore);
+
+  if(!thread_mlfqs){
+    cur->lock_blocked_on = NULL;
+    lock->priority = cur->priority;
+    
+    list_push_back(&cur->lock_list, &lock->elem);
+    list_sort(&cur->lock_list, (list_less_func *) lockcmp, NULL);
+  }
+
   lock->holder = cur;
+  
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -253,31 +258,35 @@ lock_try_acquire (struct lock *lock)
   success = sema_try_down (&lock->semaphore);
   if (success){
     lock->holder = thread_current ();
-    thread_current()->thread_blocked_on = NULL;
   }
   return success;
 }
 
+/********** Edited by acarcher **********\
+ * lock_release
+ *  * Removes lock from lock_list
+ *  * Updates priority
+ * 
+\**********                    **********/
 /* Releases LOCK, which must be owned by the current thread.
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+
 void
 lock_release (struct lock *lock) 
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  enum intr_level old_level;
-  old_level = intr_disable ();
+  if (!thread_mlfqs){
+    list_remove (&lock->elem);
+    thread_update_priority(thread_current());
+  }
 
   lock->holder = NULL;
   sema_up (&lock->semaphore);
-
-  if(!thread_mlfqs) thread_update_priority(thread_current(), lock);
-
-  intr_set_level(old_level);
 
 }
 
@@ -348,7 +357,8 @@ cond_wait (struct condition *cond, struct lock *lock)
 }
 
 /********** Edited by acarcher **********\
- * Sorts the waiters based on priority
+ * cond_signal
+ *  * Sorts the waiters based on priority
  * 
 \**********                    **********/
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -391,7 +401,10 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 }
 
 /********** Edited by acarcher **********\
- * Compares the priority of threads waiting on cond
+ * condcmp
+ *  * Compares the priority of threads waiting on cond
+ * lockcmp
+ *  * Compares the highest priorities on different locks
  * 
 \**********                    **********/
 bool condcmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
@@ -404,4 +417,13 @@ bool condcmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
 
   return t1->priority > t2->priority;
 
+}
+
+bool lockcmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED){
+
+  struct lock *l1 = list_entry(e1, struct lock, elem);
+  struct lock *l2 = list_entry(e2, struct lock, elem);
+
+  return l1->priority > l2->priority;
+  
 }

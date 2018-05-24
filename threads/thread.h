@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -23,6 +24,12 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define NICE_MIN -20
+#define NICE_DEFAULT 0
+#define NICE_MAX 20
+
+#define RECENT_CPU_DEFAULT 0
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -99,26 +106,26 @@ struct thread
     struct list_elem elem;              /* List element. */
 
     /********** Edited by acarcher **********\
-      * Alarm clock
-      *   wake
-      * Priority scheduler
-      *   priority_base
-      *   donors
-      *   donorselem
-      *   thread_blocked_on
+     * Alarm Clock
+     *  * wake
+     * Priority Scheduler
+     *  * priority_base
+     *  * lock_blocked_on
+     *  * lock_list
+     *
     \**********                    **********/
 
-    /* Alarm clock */
+    /* Alarm Clock */
     int64_t wake;                         /* Tick to wake up on */
 
    /* Priority Scheduler */
-    int priority_base;                  /* Assigned at creation and when no donors */
-    struct list donors;                 /* List of threads that are seeking to donate priority */
-    struct list_elem donorselem;        /* A way to access the donor */
-    struct thread *thread_blocked_on;   /* Thread that has shared resource */
-    struct lock *lock_blocked_on;
+    int priority_base;                  /* Base priority. */
+    struct lock *lock_blocked_on;       /* Shared resource. */
+    struct list lock_list;              /* List of locks holding on. */
 
     /* Advanced Scheduler */
+    int nice;                           /* Thread niceness. */
+    fixed_t recent_cpu;                     /* Thread CPU usage. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -170,14 +177,29 @@ int thread_get_load_avg (void);
  * prioritycmp
  * thread_donate_priority
  * thread_update_priority
+ * 
+ * mlfqs_calc_load_avg
+ * mlfqs_calc_priority
+ * mlfqs_update_priority
+ * mlfqs_update_priorities
+ * mlfqs_calc_recent_cpu
+ * 
 \**********                    **********/
 
 bool wakecmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
 bool prioritycmp(struct list_elem *e1, struct list_elem *e2, void *aux UNUSED);
 
-void thread_donate_priority(struct thread *t);
-void thread_update_priority(struct thread *t, struct lock *lock);
-size_t thread_remove_blocked_donors(struct thread *t, struct lock *lock);
+void thread_donate_priority(void);
+void thread_update_priority(struct thread *t);
+
+fixed_t mlfqs_calc_load_avg(void);
+
+int mlfqs_calc_priority(struct thread *t);
+void mlfqs_update_priorities(void);
+
+fixed_t mlfqs_calc_recent_cpu(struct thread *t);
+void mlfqs_update_recent_cpus(void);
+
 
 
 #endif /* threads/thread.h */
